@@ -1,10 +1,12 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "twoqubit.h"
+#include "threequbit.h"
 #include "gates.h"
 #include "render.h"
 #include "oracle.h"
 #include "dj.h"
+#include "teleport.h"
 #include <time.h>
 #include <stdlib.h>
 
@@ -28,15 +30,22 @@ int main(void)
 
     Vector3 center0 = (Vector3){-1.8f, 0.0f, 0.0f};
     Vector3 center1 = (Vector3){1.8f, 0.0f, 0.0f};
+    Vector3 center2 = (Vector3){0.0f, -2.0f, 0.0f}; // teleport target sphere
 
     TwoQubit s = twoqubit_init();
     int last_q0 = -1, last_q1 = -1;
 
     OracleType dj_last_oracle = ORACLE_CONSTANT_0;
-    int dj_active = 0; // whether the last state came from a DJ run (for HUD labeling)
+    int dj_active = 0;
+
+    ThreeQubit t = threequbit_init();
+    Vector3 preTeleportBloch = {0, 0, 0};
+    int tp_m0 = -1, tp_m1 = -1;
+    int tp_done = 0;
 
     Vector3 displayPos0 = twoqubit_reduced_bloch(&s, 0);
     Vector3 displayPos1 = twoqubit_reduced_bloch(&s, 1);
+    Vector3 displayPosT = threequbit_reduced_bloch(&t, 2);
 
     while (!WindowShouldClose())
     {
@@ -71,11 +80,33 @@ int main(void)
             last_q0 = last_q1 = -1;
         }
 
+        // P: prepare a random-ish message state on q0
+        if (IsKeyPressed(KEY_P))
+        {
+            t = threequbit_init();
+            threequbit_apply_gate(&t, 0, &GATE_H);
+            threequbit_apply_gate(&t, 0, &GATE_T);
+            preTeleportBloch = threequbit_reduced_bloch(&t, 0);
+            tp_done = 0;
+            tp_m0 = tp_m1 = -1;
+        }
+
+        if (IsKeyPressed(KEY_K))
+        {
+            teleport_run(&t, &tp_m0, &tp_m1);
+            tp_done = 1;
+        }
+
         if (IsKeyPressed(KEY_R))
         {
             s = twoqubit_init();
             last_q0 = last_q1 = -1;
             dj_active = 0;
+
+            t = threequbit_init();
+            preTeleportBloch = (Vector3){0, 0, 0};
+            tp_m0 = tp_m1 = -1;
+            tp_done = 0;
         }
 
         if (IsKeyPressed(KEY_M))
@@ -88,9 +119,11 @@ int main(void)
 
         Vector3 target0 = twoqubit_reduced_bloch(&s, 0);
         Vector3 target1 = twoqubit_reduced_bloch(&s, 1);
-        float t = 1.0f - expf(-SLERP_SPEED * GetFrameTime());
-        displayPos0 = bloch_slerp(displayPos0, target0, t);
-        displayPos1 = bloch_slerp(displayPos1, target1, t);
+        float t_slerp = 1.0f - expf(-SLERP_SPEED * GetFrameTime());
+        displayPos0 = bloch_slerp(displayPos0, target0, t_slerp);
+        displayPos1 = bloch_slerp(displayPos1, target1, t_slerp);
+        Vector3 targetT = threequbit_reduced_bloch(&t, 2);
+        displayPosT = bloch_slerp(displayPosT, targetT, t_slerp);
 
         double concurrence = twoqubit_concurrence(&s);
 
@@ -102,10 +135,18 @@ int main(void)
         render_bloch_frame(center1);
         render_bloch_marker(center0, displayPos0);
         render_bloch_marker(center1, displayPos1);
+        render_bloch_frame(center2);
+        render_bloch_marker(center2, displayPosT);
         EndMode3D();
 
-        DrawText("Qubit 0", (int)(screenWidth / 2 - 220), 100, 20, DARKGRAY);
-        DrawText("Qubit 1", (int)(screenWidth / 2 + 150), 100, 20, DARKGRAY);
+        // 3D-aware labels that follow the spheres
+        Vector2 label0 = GetWorldToScreen(Vector3Add(center0, (Vector3){0, 1.3f, 0}), camera);
+        Vector2 label1 = GetWorldToScreen(Vector3Add(center1, (Vector3){0, 1.3f, 0}), camera);
+        Vector2 label2 = GetWorldToScreen(Vector3Add(center2, (Vector3){0, 1.3f, 0}), camera);
+
+        DrawText("Qubit 0", (int)label0.x - 35, (int)label0.y, 20, DARKGRAY);
+        DrawText("Qubit 1", (int)label1.x - 35, (int)label1.y, 20, DARKGRAY);
+        DrawText("Qubit 2 (teleport target)", (int)label2.x - 110, (int)label2.y, 20, DARKGRAY);
 
         render_hud(&s, last_q0, last_q1, concurrence);
 
@@ -120,7 +161,18 @@ int main(void)
                          10, 105, 18, correct ? DARKGREEN : RED);
             }
         }
-        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [M] Measure  [R] Reset",
+
+        if (tp_done)
+        {
+            Vector3 post = threequbit_reduced_bloch(&t, 2);
+            DrawText(TextFormat("Alice measured: m0=%d m1=%d", tp_m0, tp_m1), 10, 130, 18, DARKBLUE);
+            DrawText(TextFormat("q0 before: (%.2f,%.2f,%.2f)  q2 after: (%.2f,%.2f,%.2f)",
+                                preTeleportBloch.x, preTeleportBloch.y, preTeleportBloch.z,
+                                post.x, post.y, post.z),
+                     10, 150, 16, DARKGREEN);
+        }
+
+        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [M] Measure  [R] Reset",
                  10, screenHeight - 30, 16, DARKGRAY);
 
         EndDrawing();

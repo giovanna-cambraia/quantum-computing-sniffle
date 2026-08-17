@@ -10,7 +10,7 @@ typedef struct {
     double complex amp[8];
 } ThreeQubit;
 
-ThreeQubit threequbit_init(void) // starts at |000>
+ThreeQubit threequbit_init(void); // starts at |000>
 
 // apply single-qubit gate to qubit 0, 1 or 2; the other two stay untouched 
 void threequbit_apply_gate(ThreeQubit *s, int qubit, const Complex2x2 *gate);
