@@ -7,10 +7,13 @@
 // draws the wireframe bloch sphere + axes, no state marker
 void render_bloch_frame(void);
 
-// draws current state vector as a point + line from origin
-void render_bloch_state(const Qubit *q);
+// draws a state marker at an explicit position 
+void render_bloch_marker(Vector3 pos);
 
-// draws HUD text: amplitudes, probabilites, key hints
+// draws hud text
 void render_hud(const Qubit *q, int last_measurement);
+
+// spherical interpolation between two units vectors by t in [0,1]
+Vector3 bloch_slerp(Vector3 from, Vector3 to, float t);
 
 #endif

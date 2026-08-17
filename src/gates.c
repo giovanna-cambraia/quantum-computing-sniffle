@@ -27,7 +27,7 @@ const Complex2x2 GATE_S = {
 
 const Complex2x2 GATE_T = {
     1, 0,
-    0, (SQRT1_2 + SQRT1_2 * I) /* e^{i*pi/4} */
+    0, (SQRT1_2 + SQRT1_2 * I) // e^{i*pi/4} 
 };
 
 Complex2x2 gate_rx(double theta) {
