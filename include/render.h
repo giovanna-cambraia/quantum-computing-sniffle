@@ -2,18 +2,22 @@
 #define RENDER_H
 
 #include "raylib.h"
-#include "qubit.h"
+#include "twoqubit.h"
 
-// draws the wireframe bloch sphere + axes, no state marker
-void render_bloch_frame(void);
+// draws a wireframe Bloch sphere + axes centered at `center` 
+void render_bloch_frame(Vector3 center);
 
-// draws a state marker at an explicit position 
-void render_bloch_marker(Vector3 pos);
+// draws a state marker at an explicit position, sphere centered at `center` 
+void render_bloch_marker(Vector3 center, Vector3 localPos);
 
 // draws hud text
-void render_hud(const Qubit *q, int last_measurement);
+void render_hud(const TwoQubit *s, int last_q0, int last_q1, double concurrence);
 
-// spherical interpolation between two units vectors by t in [0,1]
+/* 
+   spherical interpolation between two vectors by t in [0,1].
+   handles vectors shorter than unit length (used for entangled/mixed states),
+   interpolating length and direction separately. 
+*/
 Vector3 bloch_slerp(Vector3 from, Vector3 to, float t);
 
-#endif
+#endif 

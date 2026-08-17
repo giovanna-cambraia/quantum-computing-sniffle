@@ -1,59 +1,79 @@
 #include "raylib.h"
 #include "raymath.h"
-#include "qubit.h"
+#include "twoqubit.h"
 #include "gates.h"
 #include "render.h"
 #include <time.h>
 #include <stdlib.h>
 
-#define SLERP_SPEED 8.0f // higher = snappier animation, lower = dreamier 
+#define SLERP_SPEED 8.0f
 
 int main(void) {
-    const int screenWidth = 800;
-    const int screenHeight = 600;
+    const int screenWidth = 900;
+    const int screenHeight = 650;
 
-    InitWindow(screenWidth, screenHeight, "Qubit Superposition Simulator");
+    InitWindow(screenWidth, screenHeight, "Two-Qubit Entanglement Simulator");
     SetTargetFPS(60);
     srand((unsigned)time(NULL));
 
     Camera3D camera = { 0 };
-    camera.position = (Vector3){ 3.0f, 3.0f, 3.0f };
+    camera.position = (Vector3){ 0.0f, 4.0f, 6.0f };
     camera.target   = (Vector3){ 0.0f, 0.0f, 0.0f };
     camera.up       = (Vector3){ 0.0f, 1.0f, 0.0f };
     camera.fovy     = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
-    Qubit q = qubit_init();
-    int last_measurement = -1;
+    Vector3 center0 = (Vector3){ -1.8f, 0.0f, 0.0f };
+    Vector3 center1 = (Vector3){  1.8f, 0.0f, 0.0f };
 
-    Vector3 displayPos = qubit_to_bloch(&q); 
+    TwoQubit s = twoqubit_init();
+    int last_q0 = -1, last_q1 = -1;
+
+    Vector3 displayPos0 = twoqubit_reduced_bloch(&s, 0);
+    Vector3 displayPos1 = twoqubit_reduced_bloch(&s, 1);
 
     while (!WindowShouldClose()) {
-        if (IsKeyPressed(KEY_H)) qubit_apply_gate(&q, &GATE_H);
-        if (IsKeyPressed(KEY_X)) qubit_apply_gate(&q, &GATE_X);
-        if (IsKeyPressed(KEY_Y)) qubit_apply_gate(&q, &GATE_Y);
-        if (IsKeyPressed(KEY_Z)) qubit_apply_gate(&q, &GATE_Z);
-        if (IsKeyPressed(KEY_S)) qubit_apply_gate(&q, &GATE_S);
-        if (IsKeyPressed(KEY_T)) qubit_apply_gate(&q, &GATE_T);
-        if (IsKeyPressed(KEY_R)) { q = qubit_init(); last_measurement = -1; }
-        if (IsKeyPressed(KEY_M)) last_measurement = qubit_measure(&q);
+        // qubit 0 gates: lowercase 
+        if (IsKeyPressed(KEY_H)) twoqubit_apply_gate_q0(&s, &GATE_H);
+        if (IsKeyPressed(KEY_X)) twoqubit_apply_gate_q0(&s, &GATE_X);
+        if (IsKeyPressed(KEY_Y)) twoqubit_apply_gate_q0(&s, &GATE_Y);
+        if (IsKeyPressed(KEY_Z)) twoqubit_apply_gate_q0(&s, &GATE_Z);
+
+        // qubit 1 gates: shift + same key -> use LEFT_SHIFT check 
+        if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_H)) twoqubit_apply_gate_q1(&s, &GATE_H);
+        if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_X)) twoqubit_apply_gate_q1(&s, &GATE_X);
+        if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Y)) twoqubit_apply_gate_q1(&s, &GATE_Y);
+        if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Z)) twoqubit_apply_gate_q1(&s, &GATE_Z);
+
+        if (IsKeyPressed(KEY_C)) twoqubit_apply_cnot(&s, 0, 1); // control=q0, target=q1 
+
+        if (IsKeyPressed(KEY_R)) { s = twoqubit_init(); last_q0 = last_q1 = -1; }
+        if (IsKeyPressed(KEY_M)) twoqubit_measure(&s, &last_q0, &last_q1);
 
         UpdateCamera(&camera, CAMERA_ORBITAL);
 
-        // chase the real Bloch position each frame instead of snapping to it 
-        Vector3 targetPos = qubit_to_bloch(&q);
+        Vector3 target0 = twoqubit_reduced_bloch(&s, 0);
+        Vector3 target1 = twoqubit_reduced_bloch(&s, 1);
         float t = 1.0f - expf(-SLERP_SPEED * GetFrameTime());
-        displayPos = bloch_slerp(displayPos, targetPos, t);
+        displayPos0 = bloch_slerp(displayPos0, target0, t);
+        displayPos1 = bloch_slerp(displayPos1, target1, t);
+
+        double concurrence = twoqubit_concurrence(&s);
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
 
             BeginMode3D(camera);
-                render_bloch_frame();
-                render_bloch_marker(displayPos);
+                render_bloch_frame(center0);
+                render_bloch_frame(center1);
+                render_bloch_marker(center0, displayPos0);
+                render_bloch_marker(center1, displayPos1);
             EndMode3D();
 
-            render_hud(&q, last_measurement);
+            DrawText("Qubit 0", (int)(screenWidth/2 - 220), 100, 20, DARKGRAY);
+            DrawText("Qubit 1", (int)(screenWidth/2 + 150), 100, 20, DARKGRAY);
+
+            render_hud(&s, last_q0, last_q1, concurrence);
         EndDrawing();
     }
 
