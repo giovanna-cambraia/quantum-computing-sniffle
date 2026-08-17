@@ -7,6 +7,7 @@
 #include "oracle.h"
 #include "dj.h"
 #include "teleport.h"
+#include "bars.h"
 #include <time.h>
 #include <stdlib.h>
 
@@ -14,8 +15,8 @@
 
 int main(void)
 {
-    const int screenWidth = 900;
-    const int screenHeight = 650;
+    const int screenWidth = 1280;
+    const int screenHeight = 800;
 
     InitWindow(screenWidth, screenHeight, "Two-Qubit Entanglement Simulator");
     SetTargetFPS(60);
@@ -149,6 +150,9 @@ int main(void)
         DrawText("Qubit 2 (teleport target)", (int)label2.x - 110, (int)label2.y, 20, DARKGRAY);
 
         render_hud(&s, last_q0, last_q1, concurrence);
+
+        // Amplitude bars visualization
+        render_amplitude_bars(&s, 20, 420, 300, 120);
 
         if (dj_active)
         {
