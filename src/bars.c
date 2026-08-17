@@ -8,7 +8,7 @@ void render_amplitude_bars(const TwoQubit *s, int x, int y, int width, int heigh
     int gap = 12;
     int barWidth = (width - gap * (barCount - 1)) / barCount;
 
-    DrawText("Amplitude interference", x, y - 22, 18, DARKGRAY);
+    DrawText("Amplitude interference", x, y - 34, 18, DARKGRAY);
 
     for (int i = 0; i < barCount; i++) {
         double prob = twoqubit_prob(s, i);

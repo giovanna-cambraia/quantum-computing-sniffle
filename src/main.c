@@ -23,15 +23,16 @@ int main(void)
     srand((unsigned)time(NULL));
 
     Camera3D camera = {0};
-    camera.position = (Vector3){0.0f, 4.0f, 6.0f};
+    camera.position = (Vector3){0.0f, 3.0f, 6.5f};
     camera.target = (Vector3){0.0f, 0.0f, 0.0f};
     camera.up = (Vector3){0.0f, 1.0f, 0.0f};
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
-    Vector3 center0 = (Vector3){-1.8f, 0.0f, 0.0f};
-    Vector3 center1 = (Vector3){1.8f, 0.0f, 0.0f};
-    Vector3 center2 = (Vector3){0.0f, -2.0f, 0.0f}; // teleport target sphere
+    // Compact triangular cluster on same Z-plane
+    Vector3 center0 = (Vector3){-1.6f, 0.9f, 0.0f};
+    Vector3 center1 = (Vector3){ 1.6f, 0.9f, 0.0f};
+    Vector3 center2 = (Vector3){ 0.0f, -1.1f, 0.0f};
 
     TwoQubit s = twoqubit_init();
     int last_q0 = -1, last_q1 = -1;
@@ -140,10 +141,10 @@ int main(void)
         render_bloch_marker(center2, displayPosT);
         EndMode3D();
 
-        // 3D-aware labels that follow the spheres
-        Vector2 label0 = GetWorldToScreen(Vector3Add(center0, (Vector3){0, 1.3f, 0}), camera);
-        Vector2 label1 = GetWorldToScreen(Vector3Add(center1, (Vector3){0, 1.3f, 0}), camera);
-        Vector2 label2 = GetWorldToScreen(Vector3Add(center2, (Vector3){0, 1.3f, 0}), camera);
+        // 3D-aware labels that follow the spheres (1.0f clearance above 0.8f radius)
+        Vector2 label0 = GetWorldToScreen(Vector3Add(center0, (Vector3){0, 1.0f, 0}), camera);
+        Vector2 label1 = GetWorldToScreen(Vector3Add(center1, (Vector3){0, 1.0f, 0}), camera);
+        Vector2 label2 = GetWorldToScreen(Vector3Add(center2, (Vector3){0, 1.0f, 0}), camera);
 
         DrawText("Qubit 0", (int)label0.x - 35, (int)label0.y, 20, DARKGRAY);
         DrawText("Qubit 1", (int)label1.x - 35, (int)label1.y, 20, DARKGRAY);
@@ -151,8 +152,8 @@ int main(void)
 
         render_hud(&s, last_q0, last_q1, concurrence);
 
-        // Amplitude bars visualization
-        render_amplitude_bars(&s, 20, 420, 300, 120);
+        // amplitude bars - positioned with breathing room from hud text
+        render_amplitude_bars(&s, 20, 300, 300, 120);
 
         if (dj_active)
         {
