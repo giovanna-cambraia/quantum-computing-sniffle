@@ -9,6 +9,7 @@
 #include "teleport.h"
 #include "bars.h"
 #include "ghz.h"
+#include "grover.h"
 #include <time.h>
 #include <stdlib.h>
 
@@ -30,10 +31,9 @@ int main(void)
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
-    // Compact triangular cluster on same Z-plane
     Vector3 center0 = (Vector3){-1.6f, 0.9f, 0.0f};
-    Vector3 center1 = (Vector3){ 1.6f, 0.9f, 0.0f};
-    Vector3 center2 = (Vector3){ 0.0f, -1.1f, 0.0f};
+    Vector3 center1 = (Vector3){1.6f, 0.9f, 0.0f};
+    Vector3 center2 = (Vector3){0.0f, -1.1f, 0.0f};
 
     TwoQubit s = twoqubit_init();
     int last_q0 = -1, last_q1 = -1;
@@ -46,9 +46,11 @@ int main(void)
     int tp_m0 = -1, tp_m1 = -1;
     int tp_done = 0;
 
-    // GHZ state variables
     int ghz_active = 0;
     int ghz_m0 = -1, ghz_m1 = -1, ghz_m2 = -1;
+
+    int grover_active = 0;
+    GroverTarget grover_target = 3; // marks |11> 
 
     Vector3 displayPos0 = twoqubit_reduced_bloch(&s, 0);
     Vector3 displayPos1 = twoqubit_reduced_bloch(&s, 1);
@@ -104,11 +106,28 @@ int main(void)
             tp_done = 1;
         }
 
-        if (IsKeyPressed(KEY_G)) {
+        if (IsKeyPressed(KEY_G))
+        {
             ghz_prepare(&t);
             ghz_active = 1;
             tp_done = 0; 
             ghz_m0 = ghz_m1 = ghz_m2 = -1;
+        }
+
+        if (IsKeyPressed(KEY_V))
+        {
+            if (!grover_active)
+            {
+                grover_init_superposition(&s);
+                grover_active = 1;
+                dj_active = 0;
+                ghz_active = 0;
+                last_q0 = last_q1 = -1;
+            }
+            else
+            {
+                grover_iterate(&s, grover_target);
+            }
         }
 
         if (IsKeyPressed(KEY_R))
@@ -121,36 +140,45 @@ int main(void)
             preTeleportBloch = (Vector3){0, 0, 0};
             tp_m0 = tp_m1 = -1;
             tp_done = 0;
-            
+
             ghz_active = 0;
             ghz_m0 = ghz_m1 = ghz_m2 = -1;
+
+            grover_active = 0;
         }
 
         if (IsKeyPressed(KEY_M))
         {
-            if (ghz_active) {
+            if (ghz_active)
+            {
                 ghz_m0 = threequbit_measure_single(&t, 0);
                 ghz_m1 = threequbit_measure_single(&t, 1);
                 ghz_m2 = threequbit_measure_single(&t, 2);
-            } else {
+            }
+            else
+            {
                 twoqubit_measure(&s, &last_q0, &last_q1);
                 dj_active = 0;
+                grover_active = 0;
             }
         }
 
         UpdateCamera(&camera, CAMERA_ORBITAL);
 
         Vector3 target0, target1, targetT;
-        if (ghz_active) {
+        if (ghz_active)
+        {
             target0 = threequbit_reduced_bloch(&t, 0);
             target1 = threequbit_reduced_bloch(&t, 1);
             targetT = threequbit_reduced_bloch(&t, 2);
-        } else {
+        }
+        else
+        {
             target0 = twoqubit_reduced_bloch(&s, 0);
             target1 = twoqubit_reduced_bloch(&s, 1);
-            targetT = threequbit_reduced_bloch(&t, 2); 
+            targetT = threequbit_reduced_bloch(&t, 2); // still shows teleport target when not in GHZ 
         }
-        
+
         float t_slerp = 1.0f - expf(-SLERP_SPEED * GetFrameTime());
         displayPos0 = bloch_slerp(displayPos0, target0, t_slerp);
         displayPos1 = bloch_slerp(displayPos1, target1, t_slerp);
@@ -206,17 +234,25 @@ int main(void)
                      10, 150, 16, DARKGREEN);
         }
 
-        if (ghz_active) {
+        if (ghz_active)
+        {
             DrawText("GHZ state: (|000> + |111>) / sqrt(2)", 10, 85, 18, DARKBLUE);
-            if (ghz_m0 >= 0) {
+            if (ghz_m0 >= 0)
+            {
                 int allAgree = (ghz_m0 == ghz_m1) && (ghz_m1 == ghz_m2);
                 DrawText(TextFormat("Measured: q0=%d q1=%d q2=%d  (%s)",
-                    ghz_m0, ghz_m1, ghz_m2, allAgree ? "all agree" : "MISMATCH?!"),
-                    10, 105, 18, allAgree ? DARKGREEN : RED);
+                                    ghz_m0, ghz_m1, ghz_m2, allAgree ? "all agree" : "MISMATCH?!"),
+                         10, 105, 18, allAgree ? DARKGREEN : RED);
             }
         }
 
-        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [G] GHZ  [M] Measure  [R] Reset",
+        if (grover_active)
+        {
+            DrawText("Grover search: target = |11>", 10, 85, 18, DARKBLUE);
+            DrawText("Press V again to run an iteration", 10, 105, 18, DARKGRAY);
+        }
+
+        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [G] GHZ  [V] Grover  [M] Measure  [R] Reset",
                  10, screenHeight - 30, 16, DARKGRAY);
 
         EndDrawing();
