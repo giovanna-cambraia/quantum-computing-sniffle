@@ -8,6 +8,7 @@
 #include "dj.h"
 #include "teleport.h"
 #include "bars.h"
+#include "ghz.h"
 #include <time.h>
 #include <stdlib.h>
 
@@ -44,6 +45,10 @@ int main(void)
     Vector3 preTeleportBloch = {0, 0, 0};
     int tp_m0 = -1, tp_m1 = -1;
     int tp_done = 0;
+
+    // GHZ state variables
+    int ghz_active = 0;
+    int ghz_m0 = -1, ghz_m1 = -1, ghz_m2 = -1;
 
     Vector3 displayPos0 = twoqubit_reduced_bloch(&s, 0);
     Vector3 displayPos1 = twoqubit_reduced_bloch(&s, 1);
@@ -99,6 +104,13 @@ int main(void)
             tp_done = 1;
         }
 
+        if (IsKeyPressed(KEY_G)) {
+            ghz_prepare(&t);
+            ghz_active = 1;
+            tp_done = 0; 
+            ghz_m0 = ghz_m1 = ghz_m2 = -1;
+        }
+
         if (IsKeyPressed(KEY_R))
         {
             s = twoqubit_init();
@@ -109,22 +121,39 @@ int main(void)
             preTeleportBloch = (Vector3){0, 0, 0};
             tp_m0 = tp_m1 = -1;
             tp_done = 0;
+            
+            ghz_active = 0;
+            ghz_m0 = ghz_m1 = ghz_m2 = -1;
         }
 
         if (IsKeyPressed(KEY_M))
         {
-            twoqubit_measure(&s, &last_q0, &last_q1);
-            dj_active = 0;
+            if (ghz_active) {
+                ghz_m0 = threequbit_measure_single(&t, 0);
+                ghz_m1 = threequbit_measure_single(&t, 1);
+                ghz_m2 = threequbit_measure_single(&t, 2);
+            } else {
+                twoqubit_measure(&s, &last_q0, &last_q1);
+                dj_active = 0;
+            }
         }
 
         UpdateCamera(&camera, CAMERA_ORBITAL);
 
-        Vector3 target0 = twoqubit_reduced_bloch(&s, 0);
-        Vector3 target1 = twoqubit_reduced_bloch(&s, 1);
+        Vector3 target0, target1, targetT;
+        if (ghz_active) {
+            target0 = threequbit_reduced_bloch(&t, 0);
+            target1 = threequbit_reduced_bloch(&t, 1);
+            targetT = threequbit_reduced_bloch(&t, 2);
+        } else {
+            target0 = twoqubit_reduced_bloch(&s, 0);
+            target1 = twoqubit_reduced_bloch(&s, 1);
+            targetT = threequbit_reduced_bloch(&t, 2); 
+        }
+        
         float t_slerp = 1.0f - expf(-SLERP_SPEED * GetFrameTime());
         displayPos0 = bloch_slerp(displayPos0, target0, t_slerp);
         displayPos1 = bloch_slerp(displayPos1, target1, t_slerp);
-        Vector3 targetT = threequbit_reduced_bloch(&t, 2);
         displayPosT = bloch_slerp(displayPosT, targetT, t_slerp);
 
         double concurrence = twoqubit_concurrence(&s);
@@ -134,8 +163,8 @@ int main(void)
 
         BeginMode3D(camera);
         render_bloch_frame(center0);
-        render_bloch_frame(center1);
         render_bloch_marker(center0, displayPos0);
+        render_bloch_frame(center1);
         render_bloch_marker(center1, displayPos1);
         render_bloch_frame(center2);
         render_bloch_marker(center2, displayPosT);
@@ -167,7 +196,7 @@ int main(void)
             }
         }
 
-        if (tp_done)
+        if (tp_done && !ghz_active)
         {
             Vector3 post = threequbit_reduced_bloch(&t, 2);
             DrawText(TextFormat("Alice measured: m0=%d m1=%d", tp_m0, tp_m1), 10, 130, 18, DARKBLUE);
@@ -177,7 +206,17 @@ int main(void)
                      10, 150, 16, DARKGREEN);
         }
 
-        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [M] Measure  [R] Reset",
+        if (ghz_active) {
+            DrawText("GHZ state: (|000> + |111>) / sqrt(2)", 10, 85, 18, DARKBLUE);
+            if (ghz_m0 >= 0) {
+                int allAgree = (ghz_m0 == ghz_m1) && (ghz_m1 == ghz_m2);
+                DrawText(TextFormat("Measured: q0=%d q1=%d q2=%d  (%s)",
+                    ghz_m0, ghz_m1, ghz_m2, allAgree ? "all agree" : "MISMATCH?!"),
+                    10, 105, 18, allAgree ? DARKGREEN : RED);
+            }
+        }
+
+        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [G] GHZ  [M] Measure  [R] Reset",
                  10, screenHeight - 30, 16, DARKGRAY);
 
         EndDrawing();
