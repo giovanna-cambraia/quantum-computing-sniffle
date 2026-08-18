@@ -10,6 +10,7 @@
 #include "bars.h"
 #include "ghz.h"
 #include "grover.h"
+#include "decoherence.h"
 #include <time.h>
 #include <stdlib.h>
 
@@ -51,6 +52,10 @@ int main(void)
 
     int grover_active = 0;
     GroverTarget grover_target = 3; // marks |11> 
+
+    // Decoherence state variables
+    int noise_active = 0;
+    double noise_strength = 0.3; 
 
     Vector3 displayPos0 = twoqubit_reduced_bloch(&s, 0);
     Vector3 displayPos1 = twoqubit_reduced_bloch(&s, 1);
@@ -130,6 +135,24 @@ int main(void)
             }
         }
 
+        // N: Toggle decoherence
+        if (IsKeyPressed(KEY_N))
+            noise_active = !noise_active;
+
+        // UP/DOWN: Adjust decoherence strength
+        if (IsKeyDown(KEY_UP))
+        {
+            noise_strength += 0.3 * GetFrameTime();
+            if (noise_strength > 1.0)
+                noise_strength = 1.0;
+        }
+        if (IsKeyDown(KEY_DOWN))
+        {
+            noise_strength -= 0.3 * GetFrameTime();
+            if (noise_strength < 0.0)
+                noise_strength = 0.0;
+        }
+
         if (IsKeyPressed(KEY_R))
         {
             s = twoqubit_init();
@@ -164,6 +187,11 @@ int main(void)
         }
 
         UpdateCamera(&camera, CAMERA_ORBITAL);
+
+        // Apply decoherence every frame if active
+        if (noise_active) {
+            decoherence_step_q0(&s, noise_strength, GetFrameTime());
+        }
 
         Vector3 target0, target1, targetT;
         if (ghz_active)
@@ -252,7 +280,12 @@ int main(void)
             DrawText("Press V again to run an iteration", 10, 105, 18, DARKGRAY);
         }
 
-        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [G] GHZ  [V] Grover  [M] Measure  [R] Reset",
+        if (noise_active) {
+            DrawText(TextFormat("Decoherence ON — strength %.2f (UP/DOWN to adjust)", noise_strength),
+                10, 85, 18, RED);
+        }
+
+        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [G] GHZ  [V] Grover  [N] Noise  [M] Measure  [R] Reset",
                  10, screenHeight - 30, 16, DARKGRAY);
 
         EndDrawing();
