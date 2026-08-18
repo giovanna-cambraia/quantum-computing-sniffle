@@ -28,4 +28,7 @@ int threequbit_measure_single(ThreeQubit *s, int qubit);
 // this to visually compare q0's vector before teleportation to q2's vector after: they should match once the classical corrections are applied.
 Vector3 threequbit_reduced_bloch(const ThreeQubit *s, int qubit);
 
+// toffoli / CCNOT: flips target if BOTH control1 and control2 are |1>
+void threequbit_apply_toffoli(ThreeQubit *s, int control1, int control2, int target);
+
 #endif

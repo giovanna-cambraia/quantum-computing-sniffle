@@ -11,6 +11,7 @@
 #include "ghz.h"
 #include "grover.h"
 #include "decoherence.h"
+#include "ecc.h"
 #include <time.h>
 #include <stdlib.h>
 
@@ -51,11 +52,17 @@ int main(void)
     int ghz_m0 = -1, ghz_m1 = -1, ghz_m2 = -1;
 
     int grover_active = 0;
-    GroverTarget grover_target = 3; // marks |11> 
+    GroverTarget grover_target = 3; // marks |11>
 
     // Decoherence state variables
     int noise_active = 0;
-    double noise_strength = 0.3; 
+    double noise_strength = 0.3;
+
+    // ECC state variables
+    int ecc_active = 0;
+    Vector3 ecc_preBloch = {0, 0, 0};
+    int ecc_errorQubit = -2; /* -2 = not yet run, -1 = no error, 0/1/2 = which qubit */
+    ThreeQubit ecc_encodedBackup;
 
     Vector3 displayPos0 = twoqubit_reduced_bloch(&s, 0);
     Vector3 displayPos1 = twoqubit_reduced_bloch(&s, 1);
@@ -115,7 +122,7 @@ int main(void)
         {
             ghz_prepare(&t);
             ghz_active = 1;
-            tp_done = 0; 
+            tp_done = 0;
             ghz_m0 = ghz_m1 = ghz_m2 = -1;
         }
 
@@ -133,6 +140,29 @@ int main(void)
             {
                 grover_iterate(&s, grover_target);
             }
+        }
+
+        // E: Encode for error correction
+        if (IsKeyPressed(KEY_E))
+        {
+            t = threequbit_init();
+            threequbit_apply_gate(&t, 0, &GATE_H);
+            threequbit_apply_gate(&t, 0, &GATE_T);
+            ecc_preBloch = threequbit_reduced_bloch(&t, 0);
+            ecc_encode(&t);
+            ecc_encodedBackup = t; /* save the freshly-encoded state */
+            ecc_active = 1;
+            ecc_errorQubit = -2;
+            tp_done = 0;
+            ghz_active = 0;
+        }
+
+        // F: Inject random error and correct
+        if (IsKeyPressed(KEY_F) && ecc_active)
+        {
+            t = ecc_encodedBackup; /* restart from a clean encoded state every time */
+            ecc_errorQubit = ecc_inject_error(&t);
+            ecc_correct(&t);
         }
 
         // N: Toggle decoherence
@@ -168,6 +198,9 @@ int main(void)
             ghz_m0 = ghz_m1 = ghz_m2 = -1;
 
             grover_active = 0;
+
+            ecc_active = 0;
+            ecc_errorQubit = -2;
         }
 
         if (IsKeyPressed(KEY_M))
@@ -188,8 +221,9 @@ int main(void)
 
         UpdateCamera(&camera, CAMERA_ORBITAL);
 
-        // Apply decoherence every frame if active
-        if (noise_active) {
+        // apply decoherence every frame if active
+        if (noise_active)
+        {
             decoherence_step_q0(&s, noise_strength, GetFrameTime());
         }
 
@@ -204,7 +238,7 @@ int main(void)
         {
             target0 = twoqubit_reduced_bloch(&s, 0);
             target1 = twoqubit_reduced_bloch(&s, 1);
-            targetT = threequbit_reduced_bloch(&t, 2); // still shows teleport target when not in GHZ 
+            targetT = threequbit_reduced_bloch(&t, 2); // still shows teleport target when not in GHZ
         }
 
         float t_slerp = 1.0f - expf(-SLERP_SPEED * GetFrameTime());
@@ -280,12 +314,28 @@ int main(void)
             DrawText("Press V again to run an iteration", 10, 105, 18, DARKGRAY);
         }
 
-        if (noise_active) {
+        if (noise_active)
+        {
             DrawText(TextFormat("Decoherence ON — strength %.2f (UP/DOWN to adjust)", noise_strength),
-                10, 85, 18, RED);
+                     10, 85, 18, RED);
         }
 
-        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [G] GHZ  [V] Grover  [N] Noise  [M] Measure  [R] Reset",
+        if (ecc_active)
+        {
+            DrawText("3-qubit bit-flip code: press F to inject a random error + auto-correct",
+                     10, 85, 18, DARKBLUE);
+            if (ecc_errorQubit != -2)
+            {
+                Vector3 post = threequbit_reduced_bloch(&t, 0);
+                const char *errText = (ecc_errorQubit == -1) ? "no error" : TextFormat("bit-flip on qubit %d", ecc_errorQubit);
+                DrawText(TextFormat("Error: %s", errText), 10, 105, 18, MAROON);
+                DrawText(TextFormat("q0 before: (%.2f,%.2f,%.2f)  q0 after correction: (%.2f,%.2f,%.2f)",
+                                    ecc_preBloch.x, ecc_preBloch.y, ecc_preBloch.z, post.x, post.y, post.z),
+                         10, 125, 16, DARKGREEN);
+            }
+        }
+
+        DrawText("[H/X/Y/Z] q0 gates  [SHIFT+H/X/Y/Z] q1 gates  [C] CNOT  [J] DJ  [P] Prep teleport  [K] Teleport  [G] GHZ  [V] Grover  [N] Noise  [E] Encode  [F] Inject error+correct  [M] Measure  [R] Reset",
                  10, screenHeight - 30, 16, DARKGRAY);
 
         EndDrawing();

@@ -46,6 +46,22 @@ void threequbit_apply_cnot(ThreeQubit *s, int control, int target) {
     }
     for (int i = 0; i < 8; i++) s->amp[i] = new_amp[i];
 }
+
+void threequbit_apply_toffoli(ThreeQubit *s, int control1, int control2, int target) {
+    int wc1 = qbit_weight(control1);
+    int wc2 = qbit_weight(control2);
+    int wt  = qbit_weight(target);
+    double complex new_amp[8];
+
+    for (int i = 0; i < 8; i++) {
+        if ((i & wc1) && (i & wc2)) {
+            new_amp[i] = s->amp[i ^ wt];
+        } else {
+            new_amp[i] = s->amp[i];
+        }
+    }
+    for (int i = 0; i < 8; i++) s->amp[i] = new_amp[i];
+}
  
 double threequbit_prob(const ThreeQubit *s, int index) {
     return c_prob(s->amp[index]);
@@ -98,4 +114,3 @@ Vector3 threequbit_reduced_bloch(const ThreeQubit *s, int qubit) {
     v.z = (float)(rho00 - rho11);
     return v;
 }
- 
