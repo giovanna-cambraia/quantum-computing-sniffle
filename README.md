@@ -190,4 +190,3 @@ Dots animate via `bloch_slerp`, which interpolates spherically (and
 separately handles vector *length*, since reduced states can have length
 less than 1) so state transitions read as continuous motion along the
 sphere's surface rather than teleporting between frames.
-can be on itrs
