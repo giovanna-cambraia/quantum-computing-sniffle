@@ -19,8 +19,8 @@
 
 int main(void)
 {
-    const int screenWidth = 1280;
-    const int screenHeight = 800;
+    const int screenWidth = 1500;
+    const int screenHeight = 900;
 
     InitWindow(screenWidth, screenHeight, "Two-Qubit Entanglement Simulator");
     SetTargetFPS(60);
